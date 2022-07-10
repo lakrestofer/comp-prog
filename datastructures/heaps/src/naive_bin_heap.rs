@@ -1,60 +1,78 @@
-use crate::Heap;
-use std::collections::VecDeque;
+//! A simple implementation of a binary min heap using a vec.
 
-/// a simple binary heap that implements the methods of the Heap interface
-struct NaiveBinaryHeap<T: PartialOrd> {
-    vec: Vec<T>,
-    size: usize,
+use crate::Heap;
+struct NaiveBinHeap<T: PartialOrd> {
+    nodes: Vec<T>,
 }
 
-impl<T: PartialOrd> NaiveBinaryHeap<T> {
-    /// checks if the last element is in order, and if not flips it with its parent. It then checks if the parent is in order
-    fn restore_order(&mut self) {
-        // we only need to do anything if the heap is non-empty
-        if !self.vec.is_empty() {
-            let mut last_index = self.vec.len() - 1;
-            loop {
-                if last_index > 0 {
-                    // last index has a parent
-                    let parent_index = (last_index - 1) / 2;
-                    if self.vec[parent_index] <= self.vec[last_index] {
-                        // the heap order is fullfilled and we are done
-                        break;
-                    } else {
-                        // the parent is larger than the child
-                        // swap the elements and set the last_index to parent_index
-                        self.vec.swap(parent_index, last_index);
-                        last_index = parent_index;
-                    }
-                } else {
-                    // there is no other node to compare order with, we are done.
-                    break;
-                }
+impl<T: PartialOrd> NaiveBinHeap<T> {
+    /// shifts down the element with index {index} if neccessary
+    fn down(&mut self) {
+        let max_index = self.nodes.len() - 1;
+        let mut parent = 0;
+
+        loop {
+            let first_child = parent * 2 + 1;
+            let second_child = parent * 2 + 2;
+
+            // base case
+            if first_child > max_index {
+                break;
+            }
+
+            let mut child_to_swap = first_child;
+
+            // if the second child exist and if is is lesser than the first child we swap with that instead
+            if second_child <= max_index && self.nodes[first_child] >= self.nodes[second_child] {
+                child_to_swap = second_child;
+            }
+
+            // we only do the swap if the actually need to
+            if self.nodes[parent] > self.nodes[child_to_swap] {
+                self.nodes.swap(parent, child_to_swap);
+                parent = child_to_swap;
+            } else {
+                break;
+            }
+        }
+    }
+
+    fn up(&mut self) {
+        let mut child = self.nodes.len() - 1;
+        loop {
+            // 0 1 2 3 4 5 6
+            let parent = child - 1 / 2;
+            if self.nodes[parent] > self.nodes[child] {
+                self.nodes.swap(parent, child);
+                child = parent;
+            } else {
+                break;
             }
         }
     }
 }
 
-impl<T: PartialOrd> Heap<T> for NaiveBinaryHeap<T> {
+impl<T: PartialOrd> Heap<T> for NaiveBinHeap<T> {
     fn insert(&mut self, elem: T) {
-        // we push the new elem to the end of the vec
-        self.vec.push(elem);
-        self.size += 1;
-        self.restore_order()
+        // insert new element
+        self.nodes.push(elem);
+        // and then we restore the heap order
+        self.up();
     }
 
     fn peek(&self) -> Option<&T> {
-        self.vec.first()
+        self.nodes.first()
     }
 
     fn pop(&mut self) -> Option<T> {
-        if self.vec.len() == 1 {
-            self.vec.pop()
-        } else {
-            let last_index = self.vec.len() - 1;
-            // we swap the min element and last place
-            self.vec.swap()
-        }
+        // we swap the first and the last element in the vec
+        // then we can simply pop
+        let max_index = self.nodes.len() - 1;
+        self.nodes.swap(0, max_index);
+        let res = self.nodes.pop();
+        // then we restore the order
+        self.down();
+        res
     }
 
     fn replace(&mut self, elem: T) -> Option<T> {
@@ -62,10 +80,7 @@ impl<T: PartialOrd> Heap<T> for NaiveBinaryHeap<T> {
     }
 
     fn new() -> Self {
-        Self {
-            vec: Vec::new(),
-            size: 0,
-        }
+        todo!()
     }
 
     fn heapify(list: Vec<T>) -> Self {
