@@ -31,12 +31,52 @@ pub fn solve_second(input: String) {
     let n_possible_values = 1 << width; // with 5 bits then 2 ^ 5 values can be expressed
 
     let input_vec = lines.map(str_to_int).collect::<Vec<usize>>();
-    println!("input: {:?}", input_vec);
-    // we take the input, convert each base 2 number and then sort
+    // we take the input, convert each base 2 number and then sort using counting sort
     let sorted_input = counting_sort(n_possible_values, input_vec);
-    println!("output: {:?}", sorted_input);
 
-    // TODO Now that I have the input sorted, wtf do I do now?
+    let oxygen_rating = measure(true, &sorted_input, width);
+    let carbon_dioxide_rating = measure(false, &sorted_input, width);
+    println!(
+        "life support rating: {}",
+        oxygen_rating * carbon_dioxide_rating
+    );
+}
+
+fn measure(measure_majority: bool, sorted_input: &[usize], width: usize) -> usize {
+    let mut low = 0;
+    let mut high = sorted_input.len() - 1;
+    let mut k = width - 1;
+    while k > 0 {
+        if low == high {
+            break;
+        }
+        let n_zeros = count_zeros(&sorted_input, low, high, k);
+        let total = high - low + 1;
+        let go_left = if measure_majority {
+            n_zeros > total / 2
+        } else {
+            n_zeros <= total / 2
+        };
+        if go_left {
+            high -= (high - low + 1) - n_zeros;
+        } else {
+            low += n_zeros
+        }
+        k -= 1;
+    }
+    sorted_input[high]
+}
+
+fn count_zeros(xs: &[usize], l: usize, h: usize, k: usize) -> usize {
+    let mut count = 0;
+    for i in l..=h {
+        // is the kth bit at the ith postion a zero?
+        if ((xs[i] >> k) & 1) == 1 {
+            break; // when we reach a one we return the count
+        }
+        count += 1
+    }
+    count
 }
 
 fn counting_sort(max: usize, input: Vec<usize>) -> Vec<usize> {
