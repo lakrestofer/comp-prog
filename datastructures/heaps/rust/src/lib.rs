@@ -1,6 +1,6 @@
-mod naive_bin_heap;
+pub mod naive_bin_heap;
 /// generic heap trait that defines all the methods that a heap should implement
-trait Heap<T: PartialOrd + PartialEq> {
+pub trait Heap<T: PartialOrd + PartialEq> {
     // insert an element into the heap
     fn insert(&mut self, elem: T);
     /// gives a reference to the min/max element of the heap

@@ -1,7 +1,7 @@
 //! A simple implementation of a binary min heap using a vec.
 
 use crate::Heap;
-struct NaiveBinHeap<T: PartialOrd> {
+pub struct NaiveBinHeap<T: PartialOrd> {
     nodes: Vec<T>,
 }
 
