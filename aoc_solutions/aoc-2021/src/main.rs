@@ -10,6 +10,7 @@ mod day5;
 mod day6;
 mod day7;
 mod day8;
+mod day9;
 mod utils;
 
 fn main() {
@@ -44,7 +45,11 @@ fn main() {
     // crate::day7::solve_first(input.clone());
     // crate::day7::solve_second(input.clone());
 
-    let input = get_input(2021, 8);
+    // let input = get_input(2021, 8);
     // crate::day8::solve_first(input.clone());
-    crate::day8::solve_second(input.clone());
+    // crate::day8::solve_second(input.clone());
+
+    let input = get_input(2021, 9);
+    // crate::day9::solve_first(input.clone());
+    crate::day9::solve_second(input.clone());
 }
