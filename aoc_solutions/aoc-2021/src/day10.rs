@@ -7,6 +7,16 @@ pub fn solve_first(input: String) {
     println!("score: {score}");
 }
 
+pub fn solve_second(input: String) {
+    let mut lines = input.lines();
+    let mut scores: Vec<u64> = lines.map(completion_score).filter(|s| *s != 0).collect();
+    scores.sort();
+    println!("{:?}", scores);
+    let mid_index = scores.len() / 2;
+    println!("mid: {}", scores[mid_index]);
+    println!("mid+1: {}", scores[mid_index + 1]);
+}
+
 fn first_illegal_character(line: &str) -> i32 {
     let chars = line.chars();
 
@@ -18,7 +28,7 @@ fn first_illegal_character(line: &str) -> i32 {
         } else {
             let old_paren = stack.last().unwrap();
             if !is_pair(*old_paren, new_paren) {
-                score += score_table(new_paren);
+                score += illegal_score_table(new_paren);
                 break;
             } else {
                 stack.pop();
@@ -28,7 +38,50 @@ fn first_illegal_character(line: &str) -> i32 {
 
     score
 }
-fn score_table(c: char) -> i32 {
+
+fn completion_score(line: &str) -> u64 {
+    let chars = line.chars();
+    let mut stack = Vec::new();
+    for new_paren in chars {
+        if is_opening(new_paren) {
+            stack.push(new_paren);
+        } else {
+            let old_paren = stack.last().unwrap();
+            if !is_pair(*old_paren, new_paren) {
+                // corrupted!
+                return 0;
+            } else {
+                stack.pop();
+            }
+        }
+    }
+
+    let mut score = 0;
+    while !stack.is_empty() {
+        score *= 5;
+        if let Some(open_paren) = stack.pop() {
+            println!("open_paren: {open_paren}");
+            score += completion_score_table(open_paren);
+        }
+    }
+
+    if !stack.is_empty() {
+        println!("We failed matching all the pairs");
+    }
+    score
+}
+
+fn completion_score_table(c: char) -> u64 {
+    match c {
+        '(' => 1,
+        '[' => 2,
+        '{' => 3,
+        '<' => 4,
+        _ => 0,
+    }
+}
+
+fn illegal_score_table(c: char) -> i32 {
     match c {
         ')' => 3,
         ']' => 57,
