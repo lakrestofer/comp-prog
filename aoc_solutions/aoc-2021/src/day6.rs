@@ -1,3 +1,4 @@
+use std::mem::swap;
 use std::result::Result;
 use std::str::FromStr;
 
@@ -39,7 +40,7 @@ fn simulate_day(fs: &mut [usize; 9]) {
     for i in 0..=7 {
         new[i] += fs[i + 1];
     }
-    std::mem::swap(fs, &mut new);
+    swap(fs, &mut new);
 }
 
 fn count_fish(fs: &[usize; 9]) -> usize {
