@@ -19,6 +19,12 @@ impl Default for Octopus {
 }
 
 pub fn solve_first(input: String) {
+    let mut octopi = parse_input(input);
+    let n_flashes: i32 = (0..100).map(|_| simulate_one_step(&mut octopi)).sum();
+    println!("n_flashes: {n_flashes}");
+}
+
+fn parse_input(input: String) -> [[Octopus; WIDTH]; HEIGHT] {
     let mut octopi: [[Octopus; WIDTH]; HEIGHT] = [[Octopus::default(); WIDTH]; HEIGHT];
 
     for (row, line) in input.lines().enumerate() {
@@ -27,76 +33,51 @@ pub fn solve_first(input: String) {
         }
     }
 
-    let n_steps = 100;
-    let n_flashes = simulate_for(octopi, n_steps);
-    println!("n_flashes: {n_flashes}");
+    octopi
 }
+fn simulate_one_step(mut octopi: &mut [[Octopus; WIDTH]; HEIGHT]) -> i32 {
+    let mut n_flashed = 0;
+    let mut will_flash = Vec::new();
+    for (r, c) in (0..HEIGHT).zip(0..WIDTH) {
+        let octopus = &mut octopi[r][c];
+        octopus.energy_level += 1;
+        if octopus.energy_level > 9 {
+            will_flash.push((r, c));
+            octopus.will_flash = true;
+        }
+    }
+    let mut has_flashed = Vec::new();
+    while !will_flash.is_empty() {
+        let (r, c) = will_flash.pop().unwrap();
+        let octopus = &mut octopi[r][c];
 
-fn simulate_for(mut octopi: [[Octopus; WIDTH]; HEIGHT], n_steps: i32) -> i32 {
-    let mut flashes_count = 0;
-
-    for _ in 0..n_steps {
-        let mut to_flash = Vec::new();
-        for (r, c) in (0..WIDTH).zip(0..HEIGHT) {
-            let Octopus {
-                has_flashed,
-                will_flash,
-                energy_level,
-            } = &mut octopi[r][c];
-            *energy_level += 1;
-            if *energy_level > 9 {
-                *will_flash = true;
-                to_flash.push((r, c));
-            }
+        if octopus.has_flashed {
+            continue;
         }
 
-        let mut flashed = Vec::new();
-        while !to_flash.is_empty() {
-            let (r, c) = to_flash.pop().unwrap();
-            let Octopus {
-                has_flashed,
-                will_flash,
-                energy_level,
-            } = &mut octopi[r][c];
+        // flash!
+        octopus.has_flashed = true;
+        octopus.will_flash = false;
+        has_flashed.push((r, c));
 
-            if !*has_flashed {
-                // it was to flash, and has not flashed, flash!
-                *has_flashed = true;
-                *will_flash = false;
-                flashes_count += 1;
-                flashed.push((r, c));
+        // update all the neighbors and maybe add them to the flashlist
+        for (nr, nc) in valid_neighbors(r, c) {
+            let neighbor = &mut octopi[nr][nc];
+            neighbor.energy_level += 1;
+            if neighbor.energy_level > 9 && !neighbor.has_flashed && !neighbor.will_flash {
+                will_flash.push((nr, nc));
             }
-
-            // update neighbors
-            let neighbors = valid_neighbors(r, c);
-            for (r, c) in neighbors {
-                let Octopus {
-                    has_flashed,
-                    will_flash,
-                    energy_level,
-                } = &mut octopi[r][c];
-                *energy_level += 1;
-
-                if !*has_flashed && !*will_flash && *energy_level > 9 {
-                    *will_flash = true;
-                    to_flash.push((r, c));
-                }
-            }
-        }
-
-        for (r, c) in flashed {
-            let Octopus {
-                has_flashed,
-                will_flash,
-                energy_level,
-            } = &mut octopi[r][c];
-            *has_flashed = false;
-            *will_flash = false;
-            *energy_level = 0;
         }
     }
 
-    flashes_count
+    for (r, c) in has_flashed {
+        let octopus = &mut octopi[r][c];
+        n_flashed += 1;
+        octopus.energy_level = 0;
+        octopus.has_flashed = false;
+        octopus.will_flash = false;
+    }
+    n_flashed
 }
 
 const AROUND_DIF: [(isize, isize); 8] = [
