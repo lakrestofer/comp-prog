@@ -1,6 +1,5 @@
-#[macro_use]
 extern crate dotenv_codegen;
-use utils::{get_input, input_string};
+use utils::get_input;
 
 mod day01;
 mod day02;

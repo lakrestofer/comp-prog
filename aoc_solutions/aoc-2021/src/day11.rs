@@ -1,78 +1,7 @@
+use std::fmt::Display;
+
 const WIDTH: usize = 10;
 const HEIGHT: usize = 10;
-
-#[derive(Clone, Copy)]
-struct Octopus {
-    has_flashed: bool,
-    will_flash: bool,
-    energy_level: u32,
-}
-
-type Octopi = [[Octopus; WIDTH]; HEIGHT];
-impl Default for Octopus {
-    fn default() -> Self {
-        Self {
-            has_flashed: false,
-            will_flash: false,
-            energy_level: 0,
-        }
-    }
-}
-
-pub fn solve_first(input: String) {
-    let mut octopi = parse_input(input);
-    let n_flashes: i32 = (0..100).map(|_| simulate_one_step(&mut octopi)).sum();
-    println!("n_flashes: {n_flashes}");
-}
-
-fn parse_input(input: String) -> Octopi {
-    let mut octopi: Octopi = [[Octopus::default(); WIDTH]; HEIGHT];
-
-    for (row, line) in input.lines().enumerate() {
-        for (col, num) in line.chars().map(|c| c.to_digit(10).unwrap()).enumerate() {
-            octopi[row][col].energy_level = num;
-        }
-    }
-
-    octopi
-}
-fn simulate_one_step(mut octopi: &mut Octopi) -> i32 {
-    let mut n_flashed = 0;
-
-    for (r, c) in (0..HEIGHT).zip(0..WIDTH) {
-        octopi[r][c].energy_level += 1;
-    }
-    loop {
-        let fs = flash(&mut octopi);
-        if fs == 0 {
-            break;
-        } else {
-            n_flashed += fs;
-        }
-    }
-    for (r, c) in (0..HEIGHT).zip(0..WIDTH) {
-        if octopi[r][c].has_flashed {
-            octopi[r][c].energy_level = 0;
-            octopi[r][c].has_flashed = false;
-        }
-    }
-    n_flashed
-}
-
-fn flash(octopi: &mut Octopi) -> i32 {
-    let mut flashes = 0;
-    for (r, c) in (0..HEIGHT).zip((0..WIDTH)) {
-        if octopi[r][c].energy_level > 0 && !octopi[r][c].has_flashed {
-            flashes += 1;
-            octopi[r][c].has_flashed = true;
-            for (r, c) in valid_neighbors(r, c) {
-                octopi[r][c].energy_level += 1;
-            }
-        }
-    }
-    flashes
-}
-
 const AROUND_DIF: [(isize, isize); 8] = [
     (-1, -1), // NW
     (0, -1),  // N
@@ -84,6 +13,60 @@ const AROUND_DIF: [(isize, isize); 8] = [
     (-1, 0),  // W
 ];
 
+pub fn solve_first(input: String) {
+    let mut octopi = parse_input(input);
+    let n_flashes: i32 = (0..100).map(|_| step(&mut octopi)).sum();
+    println!("n_flashes: {n_flashes}");
+}
+
+/// performs one "step" and returns how many flashed
+fn step(mut octopi: &mut Octopi) -> i32 {
+    let mut n_flashed = 0;
+
+    for r in 0..HEIGHT {
+        for c in 0..WIDTH {
+            octopi[r][c].energy += 1;
+        }
+    }
+
+    loop {
+        let fs = flash(&mut octopi);
+
+        if fs == 0 {
+            break;
+        } else {
+            n_flashed += fs;
+        }
+    }
+
+    for r in 0..HEIGHT {
+        for c in 0..WIDTH {
+            if octopi[r][c].flashed {
+                octopi[r][c].energy = 0;
+                octopi[r][c].flashed = false;
+            }
+        }
+    }
+
+    n_flashed
+}
+
+fn flash(octopi: &mut Octopi) -> i32 {
+    let mut flashes = 0;
+    for r in 0..HEIGHT {
+        for c in 0..WIDTH {
+            if octopi[r][c].energy > 9 && !octopi[r][c].flashed {
+                flashes += 1;
+                octopi[r][c].flashed = true;
+                for (r, c) in valid_neighbors(r, c) {
+                    octopi[r][c].energy += 1;
+                }
+            }
+        }
+    }
+    flashes
+}
+
 fn valid_neighbors(r: usize, c: usize) -> Vec<(usize, usize)> {
     let (r, c) = (r as isize, c as isize);
     AROUND_DIF
@@ -94,4 +77,53 @@ fn valid_neighbors(r: usize, c: usize) -> Vec<(usize, usize)> {
         })
         .map(|(r, c)| (r as usize, c as usize))
         .collect()
+}
+
+fn parse_input(input: String) -> Octopi {
+    let mut octopi: Octopi = [[Octopus::default(); WIDTH]; HEIGHT];
+    for (row, line) in input.lines().enumerate() {
+        for (col, num) in line.chars().map(|c| c.to_digit(10).unwrap()).enumerate() {
+            octopi[row][col].energy = num;
+        }
+    }
+    octopi
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Eq)]
+struct Octopus {
+    flashed: bool,
+    energy: u32,
+}
+
+impl Display for Octopus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.energy)?;
+        Ok(())
+    }
+}
+
+fn print_octopi(octopi: &Octopi) {
+    for row in octopi {
+        let mut output = String::new();
+        for octopus in row {
+            output.push_str(&format!(
+                "{}{:02} ",
+                if octopus.flashed { "!" } else { " " },
+                octopus.energy
+            ))
+        }
+        println!("{output}");
+    }
+    let mut s = String::new();
+    let _ = std::io::stdin().read_line(&mut s);
+}
+
+type Octopi = [[Octopus; WIDTH]; HEIGHT];
+impl Default for Octopus {
+    fn default() -> Self {
+        Self {
+            flashed: false,
+            energy: 0,
+        }
+    }
 }
