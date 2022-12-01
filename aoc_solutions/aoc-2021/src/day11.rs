@@ -8,6 +8,7 @@ struct Octopus {
     energy_level: u32,
 }
 
+type Octopi = [[Octopus; WIDTH]; HEIGHT];
 impl Default for Octopus {
     fn default() -> Self {
         Self {
@@ -24,8 +25,8 @@ pub fn solve_first(input: String) {
     println!("n_flashes: {n_flashes}");
 }
 
-fn parse_input(input: String) -> [[Octopus; WIDTH]; HEIGHT] {
-    let mut octopi: [[Octopus; WIDTH]; HEIGHT] = [[Octopus::default(); WIDTH]; HEIGHT];
+fn parse_input(input: String) -> Octopi {
+    let mut octopi: Octopi = [[Octopus::default(); WIDTH]; HEIGHT];
 
     for (row, line) in input.lines().enumerate() {
         for (col, num) in line.chars().map(|c| c.to_digit(10).unwrap()).enumerate() {
@@ -35,49 +36,41 @@ fn parse_input(input: String) -> [[Octopus; WIDTH]; HEIGHT] {
 
     octopi
 }
-fn simulate_one_step(mut octopi: &mut [[Octopus; WIDTH]; HEIGHT]) -> i32 {
+fn simulate_one_step(mut octopi: &mut Octopi) -> i32 {
     let mut n_flashed = 0;
-    let mut will_flash = Vec::new();
+
     for (r, c) in (0..HEIGHT).zip(0..WIDTH) {
-        let octopus = &mut octopi[r][c];
-        octopus.energy_level += 1;
-        if octopus.energy_level > 9 {
-            will_flash.push((r, c));
-            octopus.will_flash = true;
+        octopi[r][c].energy_level += 1;
+    }
+    loop {
+        let fs = flash(&mut octopi);
+        if fs == 0 {
+            break;
+        } else {
+            n_flashed += fs;
         }
     }
-    let mut has_flashed = Vec::new();
-    while !will_flash.is_empty() {
-        let (r, c) = will_flash.pop().unwrap();
-        let octopus = &mut octopi[r][c];
-
-        if octopus.has_flashed {
-            continue;
+    for (r, c) in (0..HEIGHT).zip(0..WIDTH) {
+        if octopi[r][c].has_flashed {
+            octopi[r][c].energy_level = 0;
+            octopi[r][c].has_flashed = false;
         }
+    }
+    n_flashed
+}
 
-        // flash!
-        octopus.has_flashed = true;
-        octopus.will_flash = false;
-        has_flashed.push((r, c));
-
-        // update all the neighbors and maybe add them to the flashlist
-        for (nr, nc) in valid_neighbors(r, c) {
-            let neighbor = &mut octopi[nr][nc];
-            neighbor.energy_level += 1;
-            if neighbor.energy_level > 9 && !neighbor.has_flashed && !neighbor.will_flash {
-                will_flash.push((nr, nc));
+fn flash(octopi: &mut Octopi) -> i32 {
+    let mut flashes = 0;
+    for (r, c) in (0..HEIGHT).zip((0..WIDTH)) {
+        if octopi[r][c].energy_level > 0 && !octopi[r][c].has_flashed {
+            flashes += 1;
+            octopi[r][c].has_flashed = true;
+            for (r, c) in valid_neighbors(r, c) {
+                octopi[r][c].energy_level += 1;
             }
         }
     }
-
-    for (r, c) in has_flashed {
-        let octopus = &mut octopi[r][c];
-        n_flashed += 1;
-        octopus.energy_level = 0;
-        octopus.has_flashed = false;
-        octopus.will_flash = false;
-    }
-    n_flashed
+    flashes
 }
 
 const AROUND_DIF: [(isize, isize); 8] = [
