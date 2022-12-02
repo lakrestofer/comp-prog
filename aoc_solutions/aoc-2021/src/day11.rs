@@ -19,6 +19,15 @@ pub fn solve_first(input: String) {
     println!("n_flashes: {n_flashes}");
 }
 
+pub fn solve_second(input: String) {
+    let mut octopi = parse_input(input);
+    let mut n = 1;
+    while (step(&mut octopi) != 100) {
+        n += 1;
+    }
+    println!("{n}");
+}
+
 /// performs one "step" and returns how many flashed
 fn step(mut octopi: &mut Octopi) -> i32 {
     let mut n_flashed = 0;
