@@ -7,6 +7,15 @@ pub fn solve_first(input: String) {
     println!("{count}");
 }
 
+pub fn solve_second(input: String) {
+    let count: usize = input
+        .lines()
+        .map(|line| parse_ranges(line))
+        .filter(|((s1, e1), (s2, e2))| ranges_overlap(*s1, *e1, *s2, *e2))
+        .count();
+    println!("{count}");
+}
+
 fn parse_ranges(line: &str) -> ((usize, usize), (usize, usize)) {
     let (lr, hr) = line.split_once(",").unwrap();
     let (s1, e1) = lr.split_once("-").unwrap();
@@ -16,6 +25,12 @@ fn parse_ranges(line: &str) -> ((usize, usize), (usize, usize)) {
     (lr, hr)
 }
 
+#[inline]
+fn ranges_overlap(s1: usize, e1: usize, s2: usize, e2: usize) -> bool {
+    (s1 <= e2) && (s2 <= e1)
+}
+
+#[inline]
 fn range_contains_range(s1: usize, e1: usize, s2: usize, e2: usize) -> bool {
     s1 <= s2 && e2 <= e1 || s2 <= s1 && e1 <= e2
 }

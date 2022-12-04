@@ -25,6 +25,6 @@ fn main() {
     // crate::day03::solve_second(input);
 
     let input = get_input(2022, 4);
-    crate::day04::solve_first(input.clone());
-    // crate::day04::solve_second(input);
+    // crate::day04::solve_first(input.clone());
+    crate::day04::solve_second(input);
 }
