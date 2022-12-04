@@ -5,6 +5,7 @@ use utils::get_input;
 mod day01;
 mod day02;
 mod day03;
+mod day04;
 mod utils;
 
 fn main() {
@@ -19,7 +20,11 @@ fn main() {
     // crate::day02::solve_first(input.clone());
     // crate::day02::solve_second(input);
 
-    let input = get_input(2022, 3);
+    // let input = get_input(2022, 3);
     // crate::day03::solve_first(input.clone());
-    crate::day03::solve_second(input);
+    // crate::day03::solve_second(input);
+
+    let input = get_input(2022, 4);
+    crate::day04::solve_first(input.clone());
+    // crate::day04::solve_second(input);
 }
