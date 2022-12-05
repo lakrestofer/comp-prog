@@ -1,10 +1,24 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 pub fn solve_first(input: String) {
     let (stacks, instructions) = input.split_once("\n\n").unwrap();
     let stacks = parse_stacks(stacks);
     let instructions = parse_instructions(instructions);
-    let stacks = move_crates(stacks, instructions);
+    let stacks = move_crates_by_one(stacks, instructions);
+    let mut res = String::new();
+    for mut stack in stacks {
+        if let Some(top) = stack.pop() {
+            res.push(top);
+        }
+    }
+    println!("{res}");
+}
+
+pub fn solve_second(input: String) {
+    let (stacks, instructions) = input.split_once("\n\n").unwrap();
+    let stacks = parse_stacks(stacks);
+    let instructions = parse_instructions(instructions);
+    let stacks = move_crates_by_bulk(stacks, instructions);
     let mut res = String::new();
     for mut stack in stacks {
         if let Some(top) = stack.pop() {
@@ -22,7 +36,7 @@ fn print_stacks(stacks: &Stacks) {
     println!("]");
 }
 
-fn move_crates(mut stacks: Stacks, instructions: Instructions) -> Stacks {
+fn move_crates_by_one(mut stacks: Stacks, instructions: Instructions) -> Stacks {
     println!("before:");
     print_stacks(&stacks);
     for instruction in instructions {
@@ -32,6 +46,29 @@ fn move_crates(mut stacks: Stacks, instructions: Instructions) -> Stacks {
             let c = stacks[from].pop().unwrap();
             stacks[to].push(c);
         });
+        print_stacks(&stacks);
+    }
+    println!("after:");
+    print_stacks(&stacks);
+    stacks
+}
+
+fn move_crates_by_bulk(mut stacks: Stacks, instructions: Instructions) -> Stacks {
+    println!("before:");
+    print_stacks(&stacks);
+
+    let mut stack = Vec::new();
+    for instruction in instructions {
+        println!("\n{:?}", instruction);
+        let (amount, (from, to)) = instruction;
+
+        (0..amount).for_each(|_| {
+            let c = stacks[from].pop().unwrap();
+            stack.push(c);
+        });
+        while !stack.is_empty() {
+            stacks[to].push(stack.pop().unwrap());
+        }
         print_stacks(&stacks);
     }
     println!("after:");
