@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet};
 
 pub fn solve_first(input: String) {
     let (stacks, instructions) = input.split_once("\n\n").unwrap();
@@ -97,8 +97,8 @@ fn parse_stacks(input: &str) -> Stacks {
     lines.for_each(|line| {
         line.chars()
             .enumerate()
-            .filter(|(i, c)| column_indicies.contains(i))
-            .map(|(i, c)| c)
+            .filter(|(i, _c)| column_indicies.contains(i))
+            .map(|(_i, c)| c)
             .enumerate()
             .map(|(i, c)| (i + 1, c))
             .filter(|(_, c)| *c != ' ')
@@ -109,7 +109,7 @@ fn parse_stacks(input: &str) -> Stacks {
 }
 
 fn parse_instructions(input: &str) -> Instructions {
-    let mut lines = input.lines();
+    let lines = input.lines();
     let mut instructions = Vec::new();
     for line in lines {
         let mut nums = line

@@ -46,18 +46,25 @@ impl Forest {
         }
     }
 
-    fn tree_line(&self, r: usize, c: usize, direction: Direction) -> Vec<u32> {
+    fn tree_line(&self, r: usize, c: usize, direction: Direction, from_tree: bool) -> Vec<u32> {
         let mut r = r as isize;
         let mut c = c as isize;
         let mut slice = VecDeque::new();
         while 0 <= r && r < self.width as isize && 0 <= c && c < self.height as isize {
-            slice.push_front(self.forest[r as usize][c as usize]);
+            if from_tree {
+                slice.push_back(self.forest[r as usize][c as usize]);
+            } else {
+                slice.push_front(self.forest[r as usize][c as usize]);
+            }
             match direction {
                 Direction::Up => r -= 1,
                 Direction::Down => r += 1,
                 Direction::Left => c -= 1,
                 Direction::Right => c += 1,
             }
+        }
+        if from_tree {
+            slice.pop_front();
         }
         slice.into()
     }
@@ -69,7 +76,11 @@ impl Forest {
             let tree = self.forest[r][c];
             DIRECTIONS
                 .iter()
-                .find(|dir| self.tree_line(r, c, **dir).windows(2).all(|w| w[0] < tree))
+                .find(|dir| {
+                    self.tree_line(r, c, **dir, false)
+                        .windows(2)
+                        .all(|w| w[0] < tree)
+                })
                 .is_some()
         }
     }
@@ -85,6 +96,40 @@ impl Forest {
         }
         n_visible
     }
+
+    fn max_scenic_score(&self) -> usize {
+        let mut max = 0;
+        for r in 1..(self.height - 1) {
+            for c in 1..(self.width - 1) {
+                let mut score = 1;
+                let tree_height = self.forest[r][c];
+                println!("({r},{c}), tree height: {tree_height}");
+                for dir in DIRECTIONS.iter() {
+                    let line = self.tree_line(r, c, *dir, true);
+                    println!("   {dir}-{:?}", line);
+                    let mut view_distance = 0;
+                    for height in line.into_iter() {
+                        view_distance += 1;
+                        if height >= tree_height {
+                            break;
+                        }
+                    }
+                    println!("   view_distance: {view_distance}");
+                    score *= view_distance;
+                }
+                println!("   scienic_score: {score}");
+
+                max = max.max(score);
+            }
+        }
+        max
+    }
+}
+
+fn print_forest(forest: &Forest) {
+    for row in &forest.forest {
+        println!("{:?}", row);
+    }
 }
 
 const INPUT: &'static str = "30373\n25512\n65332\n33549\n35390";
@@ -96,12 +141,7 @@ pub fn solve_first(input: String) {
 
 pub fn solve_second(input: String) {
     let forest = Forest::parse_to_forest(input);
-}
-
-fn is_visible(line: &[u32]) -> bool {
-    if line.len() == 1 {
-        true
-    } else {
-        line.windows(2).all(|w| w[0] < w[1])
-    }
+    print_forest(&forest);
+    let max = forest.max_scenic_score();
+    println!("{max}");
 }
