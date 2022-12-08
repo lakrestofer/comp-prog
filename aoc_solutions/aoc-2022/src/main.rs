@@ -1,4 +1,4 @@
-#![feature(iter_array_chunks)]
+#![feature(iter_array_chunks, is_sorted)]
 extern crate dotenv_codegen;
 use utils::get_input;
 
@@ -9,6 +9,7 @@ mod day04;
 mod day05;
 mod day06;
 mod day07;
+mod day08;
 mod utils;
 
 fn main() {
@@ -39,7 +40,11 @@ fn main() {
     // crate::day06::solve_first(input.clone());
     // crate::day06::solve_second(input);
 
-    let input = get_input(2022, 7);
-    crate::day07::solve_first(input.clone());
+    // let input = get_input(2022, 7);
+    // crate::day07::solve_first(input.clone());
     // crate::day07::solve_second(input);
+
+    let input = get_input(2022, 8);
+    crate::day08::solve_first(input.clone());
+    // crate::day08::solve_second(input);
 }

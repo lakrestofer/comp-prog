@@ -1,126 +1,97 @@
-use std::collections::{HashMap, HashSet};
+struct Node {
+    value: usize,
+    parent: Option<usize>,
+    children: Vec<usize>,
+}
 
-const INPUT: &str = "$ cd /
-$ ls
-dir a
-14848514 b.txt
-8504156 c.dat
-dir d
-$ cd a
-$ ls
-dir e
-29116 f
-2557 g
-62596 h.lst
-$ cd e
-$ ls
-584 i
-$ cd ..
-$ cd ..
-$ cd d
-$ ls
-4060174 j
-8033020 d.log
-5626152 d.ext
-7214296 k";
+impl Node {
+    fn is_directory(&self) -> bool {
+        self.children.len() > 0
+    }
+}
+
+struct FileTree {
+    files: Vec<Node>,
+}
+
+impl FileTree {
+    fn insert(&mut self, value: usize, parent: Option<usize>) -> Option<usize> {
+        let index = self.files.len();
+        if let Some(parent) = parent {
+            self.files[parent].children.push(index);
+            self.update_size(Some(parent), value);
+        }
+        self.files.push(Node {
+            value,
+            parent,
+            children: vec![],
+        });
+        Some(index)
+    }
+
+    fn node(&self, index: Option<usize>) -> &Node {
+        match index {
+            Some(index) => &self.files[index],
+            None => panic!("Trying to access a non-existing node"),
+        }
+    }
+
+    fn update_size(&mut self, index: Option<usize>, size: usize) {
+        let mut current = index;
+        while let Some(index) = current {
+            let node = &mut self.files[index];
+            node.value += size;
+            current = node.parent;
+        }
+    }
+}
+
+const MAX_DIR_SIZE: usize = 100000;
+const TOTAL_DISK_SIZE: usize = 70000000;
+const UPDATE_SIZE: usize = 30000000;
 
 pub fn solve_first(input: String) {
-    let tree = parse_input(input);
-    println!("{:?}", tree);
-    let mut dirs = Vec::new();
-    for dir_path in tree.keys() {
-        let total_size = compute_total(dir_path, &tree);
-        dirs.push((dir_path, total_size));
-    }
-    dirs.sort_by_key(|(_, size)| *size);
-    let sum: usize = dirs.into_iter().take(3).map(|(_, size)| size).sum();
-    println!("sum: {sum}");
-}
-
-fn compute_total(path: &DirPath, tree: &HashMap<DirPath, Dir>) -> usize {
-    let mut sum: usize = 0;
-    let dir = tree.get(path).unwrap();
-    sum += dir.files.iter().map(|(_, size)| *size).sum::<usize>();
-    sum += dir
-        .dirs
-        .iter()
-        .map(|dir_path| compute_total(dir_path, &tree))
-        .sum::<usize>();
-    sum
-}
-
-type DirPath = String;
-type FilePath = String;
-#[derive(Default, Debug)]
-struct Dir {
-    files: Vec<(FilePath, usize)>,
-    dirs: Vec<DirPath>,
-}
-
-fn parse_input(input: String) -> HashMap<DirPath, Dir> {
-    let mut current_dir = Vec::new();
-    let mut file_system = HashMap::new();
-    let mut lines = input.lines().peekable();
-    while lines.peek().is_some() {
-        let line = lines.next().unwrap();
-
-        if line.starts_with("$ cd ") {
-            // line is cd command
-            cd(line, &mut current_dir);
-        } else if line == "$ ls" {
-            while lines.peek().is_some() && !lines.peek().unwrap().starts_with("$") {
-                let next = lines.next().unwrap();
-
-                let mut cd_clone = current_dir.clone();
-                let directory_content = file_system
-                    .entry(current_dir_string(&current_dir))
-                    .or_insert(Dir::default());
-
-                if next.starts_with("dir ") {
-                    // is directory and should be added to map of directories
-                    let dir_name = next.trim_start_matches("dir ");
-
-                    // the new directory added to current dir
-                    cd(dir_name, &mut cd_clone);
-                    let new_dir_path = current_dir_string(&cd_clone);
-
-                    directory_content.dirs.push(new_dir_path.clone());
-
-                    // we also add the new directory to the file_system
-                    file_system.entry(new_dir_path).or_insert(Dir::default());
-                } else {
-                    // the row is a file
-                    let (num_str, file_name) = next.split_once(" ").unwrap();
-                    cd(file_name, &mut cd_clone);
-                    let file_path = current_dir_string(&cd_clone);
-
-                    directory_content
-                        .files
-                        .push((file_path, num_str.parse().unwrap()));
-                }
+    let mut file_tree = FileTree { files: vec![] };
+    let mut current: Option<usize> = None;
+    input.lines().for_each(|line| {
+        let splited: Vec<&str> = line.split(" ").collect();
+        match splited[0] {
+            "$" => match splited[1] {
+                "cd" => match splited[2] {
+                    ".." => {
+                        current = file_tree.node(current).parent;
+                    }
+                    _ => {
+                        current = file_tree.insert(0, current);
+                    }
+                },
+                _ => {}
+            },
+            "dir" => {}
+            _ => {
+                file_tree.insert(splited[0].parse::<usize>().unwrap(), current);
             }
         }
-    }
-    file_system
-}
+    });
+    let directories: Vec<&Node> = file_tree
+        .files
+        .iter()
+        .filter(|node| node.is_directory())
+        .collect();
 
-fn current_dir_string(current_dir: &Vec<&str>) -> String {
-    let mut string = String::new();
+    let part1: usize = directories
+        .iter()
+        .filter(|node| node.value <= MAX_DIR_SIZE)
+        .map(|node| node.value)
+        .sum();
+    println!("part1 {}", part1);
 
-    for s in current_dir.iter() {
-        string.push_str(s);
-        if *s != "/" {
-            string.push('/');
-        }
-    }
-    string
-}
-
-fn cd<'a>(line: &'a str, current_dir: &mut Vec<&'a str>) {
-    let dir = line.trim_start_matches("$ cd ");
-    if dir == ".." {
-        current_dir.pop().unwrap();
-    } else {
-        current_dir.push(dir);
-    }
+    let to_delete_size = UPDATE_SIZE - (TOTAL_DISK_SIZE - file_tree.files[0].value);
+    let part2 = directories
+        .iter()
+        .filter(|node| node.value >= to_delete_size)
+        .map(|node| node.value)
+        .min()
+        .unwrap();
+    println!("part2 {}", part2);
 }
