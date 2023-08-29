@@ -1,5 +1,5 @@
 [package]
-name = "counting_sort"
+name = "rust"
 version = "0.1.0"
 edition = "2021"
 
