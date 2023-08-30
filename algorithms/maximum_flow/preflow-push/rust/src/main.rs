@@ -6,201 +6,234 @@ fn main() {
     // let input: String = std::fs::read_to_string("./data/railwayplanning/secret/1small.in").unwrap();
     let input: String = std::fs::read_to_string("./data/tiny/0.in").unwrap();
     let first_n: Vec<&str> = input.lines().take(10).collect();
-    println!("input: {:?}", first_n);
+    println!("input: {:?}\n", first_n);
 
-    let network = Network::parse(input);
-    println!("graph: {:?}", network.adjacency_list);
+    let mut network = new_network(input);
 
-    // let max_flow = network.max_flow();
+    let max_flow = max_flow(&mut network);
 
-    // println!("Maximum flow is: {max_flow}");
+    println!("Maximum flow is: {max_flow}");
+}
+
+fn print_network(network: &Network) {
+    println!("Network: with {} nodes and {} edges", network.n, network.m);
+    println!("nodes");
+    for node in network.nodes.iter() {
+        println!("{:?}", node);
+    }
+    for edge in network.edges.iter() {
+        let edge = edge.lock().unwrap();
+        println!("{:?}", edge);
+    }
+    print!("Overflowing nodes: {:?}", network.overflowing_nodes);
+    println!("\n");
 }
 
 type NodeId = usize;
-type EdgeId = usize;
 type EdgePointer = Arc<Mutex<Edge>>;
-type NodePointer = Arc<Mutex<Node>>;
 
 #[derive(Default, Clone, Debug)]
 struct Node {
-    excess_flow: i64,
-    height: usize,
+    id: NodeId,
+    e: i64,
+    h: usize,
+}
+
+impl Node {
+    fn new(id: NodeId) -> Self {
+        Self {
+            id,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Default, Clone, Debug)]
 struct Edge {
-    pub max_capacity: i64,
-    pub flow: i64,
-    pub from: NodeId,
-    pub to: NodeId,
-    pub forward_edge: bool,
+    /// the source node
+    pub u: NodeId,
+    /// the destination node
+    pub v: NodeId,
+    /// maximum flow capacity
+    pub c: i64,
+    /// the current flow
+    pub f: i64,
+}
+
+fn new_edge(u: NodeId, v: NodeId, c: i64, f: i64) -> Arc<Mutex<Edge>> {
+    Arc::new(Mutex::new(Edge { u, v, c, f }))
 }
 
 /// our graph datastructure
 #[derive(Debug)]
 struct Network {
-    n: usize, // number of nodes
-    m: usize, // number of edges
-    sink: NodeId,
+    /// number of nodes
+    n: usize,
+    /// number of edges
+    m: usize,
+    /// the source
+    source: NodeId,
+    /// the drain (sink)
     drain: NodeId,
+    /// nodes
     nodes: Vec<Node>,
+    /// edges
+    edges: Vec<EdgePointer>,
+    /// adjacency list
     adjacency_list: Vec<Vec<EdgePointer>>,
-    adjacency_matrix: Vec<Vec<Option<EdgePointer>>>,
+    /// overflowing nodes with positive excess flow (meaning more flow in than out)
+    overflowing_nodes: Vec<NodeId>,
 }
 
-impl Network {
-    fn parse(input: String) -> Self {
-        let mut numbers = input
-            .split_whitespace()
-            .map(|c| c.parse::<usize>())
-            .filter(|nr| nr.is_ok())
-            .map(|nr| nr.unwrap());
+fn new_network(input: String) -> Network {
+    let mut numbers = input
+        .split_whitespace()
+        .map(|c| c.parse::<usize>())
+        .filter(|nr| nr.is_ok())
+        .map(|nr| nr.unwrap());
 
-        // the number of nodes and edges
-        let n = numbers.next().unwrap();
-        let m = numbers.next().unwrap();
-        // we skip the next two numbers since we are not interested in them
-        numbers.next();
-        numbers.next();
+    // the number of nodes and edges
+    let n = numbers.next().unwrap();
+    let m = numbers.next().unwrap();
 
-        let nodes = vec![Node::default(); n];
-        let mut adjacency_list: Vec<Vec<EdgePointer>> = vec![Vec::new(); n];
-        let mut adjacency_matrix: Vec<Vec<Option<EdgePointer>>> = vec![vec![None; n]; n];
+    // we skip the next two numbers since we are not interested in them
+    numbers.next();
+    numbers.next();
 
-        for _ in 0..m {
-            let from = numbers.next().unwrap();
-            let to = numbers.next().unwrap();
-            let max_capacity = numbers.next().unwrap() as i64;
-            let flow = 0;
+    // adjacency list
+    let mut al: Vec<Vec<EdgePointer>> = vec![Vec::new(); n];
+    let mut edges = Vec::with_capacity(m);
 
-            let forward_edge = Arc::new(Mutex::new(Edge {
-                max_capacity,
-                flow,
-                from,
-                to,
-                forward_edge: true,
-            }));
+    for _ in 0..m {
+        let u = numbers.next().unwrap();
+        let v = numbers.next().unwrap();
+        let c = numbers.next().unwrap() as i64;
+        let f = 0;
 
-            let backward_edge = Arc::new(Mutex::new(Edge {
-                max_capacity,
-                flow,
-                from: to,
-                to: from,
-                forward_edge: false,
-            }));
+        let edge = new_edge(u, v, c, f);
+        edges.push(edge.clone());
 
-            // The adjacency list and matrix will contain all leaving and entering edges.
-            // Us using Arc<Mutex<T>> (Rc<Cell> would have worked as well) makes it possible to use the O(1) retreiveal of neighbors
-            // and specific edges.
-            adjacency_list[from].push(forward_edge.clone()); // we save the forward edge in both the adjacency list
-            adjacency_matrix[from][to] = Some(forward_edge); // and matrix
-            adjacency_list[to].push(backward_edge.clone()); // and then the bakwards edge
-            adjacency_matrix[to][from] = Some(backward_edge);
-        }
+        al[u].push(edge.clone()); // we save the forward edge in both the adjacency list
+        al[v].push(edge.clone()); // and then the backwards edge
+    }
 
-        Network {
-            n,
-            m,
-            sink: 0,
-            drain: n - 1,
-            nodes,
-            adjacency_list,
-            adjacency_matrix,
-        }
+    let mut nodes = Vec::with_capacity(n);
+
+    for i in 0..n {
+        nodes.push(Node::new(i));
+    }
+
+    Network {
+        n,
+        m,
+        source: 0,
+        drain: n - 1,
+        nodes,
+        edges,
+        adjacency_list: al,
+        overflowing_nodes: Vec::<NodeId>::new(),
     }
 }
 
-impl Network {
-    fn max_flow(mut self) -> i64 {
-        // set the excess flow of all nodes to 0 (default)
-        // set the height of every other node to 0 (default)
-        // we do nothing...
+fn max_flow(network: &mut Network) -> i64 {
+    println!("before init: ");
+    print_network(network);
 
-        // set the height of the source to the number of nodes
-        self.nodes[0].height = self.n;
+    let s_id = network.source;
+    // set the height of the source to the number of nodes
+    network.nodes[s_id].h = network.n;
+    // set the height of every other node to 0 (default)
 
-        // we keep track of all nodes whose effective flow is positive (meaning more flow in than out)
-        let mut overflowing_nodes: Vec<usize> = Vec::new();
+    // the outward flow from the source is the maximum given by the edges capacity
+    for u_v in network.adjacency_list[s_id].clone().iter() {
+        let mut u_v = u_v.lock().unwrap();
 
-        // the outward flow from the source is the maximum given by the edges capacity
-        for edge in self.adjacency_list[0].iter_mut() {
-            let mut edge = edge.lock().unwrap();
-            let edge_capacity = edge.max_capacity;
-            // the flow is set to its maximum for each edge
-            edge.flow = edge_capacity;
-            // we set the effective flow of the target to the incomming flow
-            self.nodes[edge.to].excess_flow = edge_capacity;
-            // this node will have positive excess flow so we add it to the overflowing_nodes list
-            overflowing_nodes.push(edge.to);
-            self.nodes[0].excess_flow -= edge_capacity;
-        }
+        // set the excess flow of the source node
+        network.nodes[s_id].e += u_v.c; // TODO
 
-        // set the flow of every other edge that do not start in the source to zero (default)
-        // we do nothing
-
-        while !overflowing_nodes.is_empty() {
-            let from_node = overflowing_nodes.pop().unwrap();
-            // if this node is the tail or has been updated to not overflow
-            // since it got put into the stack we skip this iteration
-            if from_node == self.n - 1 || self.nodes[from_node].excess_flow <= 0 {
-                continue;
-            };
-
-            // we see if there exists an edge
-            let edge = self.adjacency_list[from_node]
-                .iter()
-                .find(|edge| {
-                    let edge = edge.lock().unwrap();
-                    self.nodes[edge.from].height > self.nodes[edge.to].height
-                })
-                .map(|e| e.clone());
-
-            if let Some(edge) = edge {
-                let edge = edge.lock().unwrap();
-                self.push(edge.from, edge.to);
-            } else {
-                self.relabel(from_node)
-            }
-        }
-
-        // the maximum flow is the effective flow of the drain
-        let maximum_flow = self.nodes[self.n - 1].excess_flow;
-        maximum_flow
-    }
-
-    fn push(&mut self, from: usize, to: usize) {
-        // check that the edge is
-        assert!(
-            self.nodes[from].excess_flow > 0 && (self.nodes[from].height > self.nodes[to].height)
+        push(
+            network,
+            s_id,
+            // the graph might have a edge backward edge from s to v
+            if s_id == u_v.u { u_v.v } else { u_v.u },
+            &mut u_v,
         );
+    }
+    println!("after init: ");
+    print_network(network);
 
-        let mut edge = self.adjacency_matrix[from][to]
-            .as_ref()
-            .unwrap()
-            .lock()
-            .unwrap();
+    // set the excess flow of all nodes to 0 (default)
 
-        if edge.forward_edge {
-            let excess_flow = self.nodes[from].excess_flow;
-            let delta = excess_flow.min(edge.max_capacity - edge.flow);
-            edge.flow += delta;
-            self.nodes[edge.from].excess_flow -= delta;
-            self.nodes[edge.to].excess_flow += delta;
+    // set the flow of every other edge that do not start in the source to zero (default)
+    // we do nothing
+
+    while !network.overflowing_nodes.is_empty() {
+        print_network(network);
+        let u: NodeId = network.overflowing_nodes.pop().unwrap();
+        println!("u: {u}");
+        // if this node is the tail or has been updated to not overflow
+        // since it got put into the stack we skip this iteration
+        if u == network.n - 1 || network.nodes[u].e <= 0 {
+            println!("continuing");
+            continue;
+        };
+
+        // we see if there exists an edge
+        let neighbors = &network.adjacency_list[u];
+        println!("neighbors: {:?}", neighbors);
+        let u_v = neighbors
+            .iter()
+            .find(|v_w| {
+                let edge = v_w.lock().unwrap();
+                edge.u == u && network.nodes[edge.u].h > network.nodes[edge.v].h
+            })
+            .map(|e| e.clone());
+
+        if let Some(u_v) = u_v {
+            let mut u_v = u_v.lock().unwrap();
+
+            push(network, u_v.u, u_v.v, &mut u_v);
         } else {
-            // this edge is not a forward edge, we still want to modify the forward edge though, so we have to retrieve it.
-            let mut edge = self.adjacency_matrix[to][from]
-                .as_ref()
-                .unwrap()
-                .lock()
-                .unwrap();
-
-            let delta = self.nodes[edge.from].excess_flow.min(edge.flow);
-
-            edge.flow -= delta;
-            self.nodes[edge.from].excess_flow += delta;
-            self.nodes[edge.to].excess_flow -= delta;
+            relabel(network, u);
         }
     }
 
-    fn relabel(&mut self, node: usize) {}
+    // the maximum flow is the effective flow of the drain
+    network.nodes[network.drain].e
+}
+
+fn push(network: &mut Network, u: NodeId, v: NodeId, e: &mut Edge) {
+    let d;
+    if u == e.u {
+        d = network.nodes[u].e.min(e.c - e.f);
+        e.f += d;
+    } else {
+        d = network.nodes[u].e.min(e.c + e.f);
+        e.f -= d;
+    }
+
+    network.nodes[u].e -= d;
+    network.nodes[v].e += d;
+
+    if cfg!(debug_assertions) {
+        assert!(d >= 0);
+        assert!(network.nodes[u].e >= 0);
+        assert!(e.f.abs() <= e.c);
+    }
+
+    if network.nodes[u].e > 0 && network.source != u && network.drain != u {
+        network.overflowing_nodes.push(u);
+    }
+
+    if network.nodes[v].e == d && network.source != v && network.drain != v {
+        network.overflowing_nodes.push(v);
+    }
+}
+
+fn relabel(network: &mut Network, u: NodeId) {
+    network.nodes[u].h += 1;
+
+    if network.source != u && network.drain != u {
+        network.overflowing_nodes.push(u);
+    }
 }
