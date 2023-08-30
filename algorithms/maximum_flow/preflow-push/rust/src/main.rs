@@ -33,6 +33,7 @@ struct Edge {
     pub flow: i64,
     pub from: NodeId,
     pub to: NodeId,
+    pub forward_edge: bool,
 }
 
 /// our graph datastructure
@@ -44,6 +45,7 @@ struct Network {
     drain: NodeId,
     nodes: Vec<Node>,
     adjacency_list: Vec<Vec<EdgePointer>>,
+    adjacency_matrix: Vec<Vec<Option<EdgePointer>>>,
 }
 
 impl Network {
@@ -63,7 +65,7 @@ impl Network {
 
         let nodes = vec![Node::default(); n];
         let mut adjacency_list: Vec<Vec<EdgePointer>> = vec![Vec::new(); n];
-        let mut edges: Vec<EdgePointer> = Vec::new();
+        let mut adjacency_matrix: Vec<Vec<Option<EdgePointer>>> = vec![vec![None; n]; n];
 
         for _ in 0..m {
             let from = numbers.next().unwrap();
@@ -71,18 +73,29 @@ impl Network {
             let max_capacity = numbers.next().unwrap() as i64;
             let flow = 0;
 
-            let edge = Edge {
+            let forward_edge = Arc::new(Mutex::new(Edge {
                 max_capacity,
                 flow,
                 from,
                 to,
-            };
+                forward_edge: true,
+            }));
 
-            let edge = Arc::new(Mutex::new(edge));
+            let backward_edge = Arc::new(Mutex::new(Edge {
+                max_capacity,
+                flow,
+                from: to,
+                to: from,
+                forward_edge: false,
+            }));
 
-            // the adjacency list for each node will contain all leaving and entering edges
-            adjacency_list[from].push(edge.clone());
-            adjacency_list[to].push(edge);
+            // The adjacency list and matrix will contain all leaving and entering edges.
+            // Us using Arc<Mutex<T>> (Rc<Cell> would have worked as well) makes it possible to use the O(1) retreiveal of neighbors
+            // and specific edges.
+            adjacency_list[from].push(forward_edge.clone()); // we save the forward edge in both the adjacency list
+            adjacency_matrix[from][to] = Some(forward_edge); // and matrix
+            adjacency_list[to].push(backward_edge.clone()); // and then the bakwards edge
+            adjacency_matrix[to][from] = Some(backward_edge);
         }
 
         Network {
@@ -92,6 +105,7 @@ impl Network {
             drain: n - 1,
             nodes,
             adjacency_list,
+            adjacency_matrix,
         }
     }
 }
@@ -112,13 +126,12 @@ impl Network {
         for edge in self.adjacency_list[0].iter_mut() {
             let mut edge = edge.lock().unwrap();
             let edge_capacity = edge.max_capacity;
-            // the flow is set to its maximum for each edge (will be lowered probably)
+            // the flow is set to its maximum for each edge
             edge.flow = edge_capacity;
-            // we set the effective flow of the target to the
+            // we set the effective flow of the target to the incomming flow
             self.nodes[edge.to].excess_flow = edge_capacity;
             // this node will have positive excess flow so we add it to the overflowing_nodes list
             overflowing_nodes.push(edge.to);
-
             self.nodes[0].excess_flow -= edge_capacity;
         }
 
@@ -156,9 +169,37 @@ impl Network {
     }
 
     fn push(&mut self, from: usize, to: usize) {
-        let from_node = &self.nodes[from];
-        let to_node = &self.nodes[to];
-        assert!(from_node.excess_flow > 0 && (from_node.height > to_node.height));
+        // check that the edge is
+        assert!(
+            self.nodes[from].excess_flow > 0 && (self.nodes[from].height > self.nodes[to].height)
+        );
+
+        let mut edge = self.adjacency_matrix[from][to]
+            .as_ref()
+            .unwrap()
+            .lock()
+            .unwrap();
+
+        if edge.forward_edge {
+            let excess_flow = self.nodes[from].excess_flow;
+            let delta = excess_flow.min(edge.max_capacity - edge.flow);
+            edge.flow += delta;
+            self.nodes[edge.from].excess_flow -= delta;
+            self.nodes[edge.to].excess_flow += delta;
+        } else {
+            // this edge is not a forward edge, we still want to modify the forward edge though, so we have to retrieve it.
+            let mut edge = self.adjacency_matrix[to][from]
+                .as_ref()
+                .unwrap()
+                .lock()
+                .unwrap();
+
+            let delta = self.nodes[edge.from].excess_flow.min(edge.flow);
+
+            edge.flow -= delta;
+            self.nodes[edge.from].excess_flow += delta;
+            self.nodes[edge.to].excess_flow -= delta;
+        }
     }
 
     fn relabel(&mut self, node: usize) {}
